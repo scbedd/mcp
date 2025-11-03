@@ -14,6 +14,13 @@
 - Use `./eng/scripts/Build-Local.ps1 -UsePaths -VerifyNpx` to verify changes to powershell, c# project files and npm packages
 - Don't run local builds to check pipeline YAML files (e.g., files in `eng/pipelines/` with `.yml` extension)
 
+## Transitioning Live Tests to Recorded Tests
+
+- In order to record **anything**, the tool being bested must support injection of `IHttpClientService` into its clients and use `CreateClient` methods to instantiate the `HttpClient` that is used for all requests.
+  - todo: example keyvault link here
+- Test classes should be re-parented from `CommandTestsBase` to `RecordedCommandTestsBase`, fixture changes should be made accordingly.
+-
+
 ## Pull Request Guidelines
 
 - Ensure all tests pass
