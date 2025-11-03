@@ -16,10 +16,19 @@
 
 ## Transitioning Live Tests to Recorded Tests
 
-- In order to record **anything**, the tool being bested must support injection of `IHttpClientService` into its clients and use `CreateClient` methods to instantiate the `HttpClient` that is used for all requests.
+- Always convert `tool` services to inject `IHttpClientService` into its clients and use `CreateClient` methods to instantiate the `HttpClient` that is used for all requests.
   - todo: example keyvault link here
-- Test classes should be re-parented from `CommandTestsBase` to `RecordedCommandTestsBase`, fixture changes should be made accordingly.
--
+- Always reparent test classes parented from `CommandTestsBase` to `RecordedCommandTestsBase`, fixture changes should be made accordingly.
+- Always generate a new `assets.json` file alongside the livetest csproj file if one does not exist. This file should contain the following content:
+  ```jsonc
+  {
+    "AssetsRepo": "Azure/azure-sdk-assets",
+    "AssetsRepoPrefixPath": "",
+    "TagPrefix": "<LiveTestCSProjFileNameWithoutExtension>", // e.g., "Azure.Mcp.Tools.KeyVault.LiveTests"
+    "Tag": ""
+  }
+  ```
+- Where applicable: copilot should follow the `The sanitization/playback loop` loop section within the [recorded test documentation](../docs/recorded-tests.md) for more details on how to convert and validate recorded tests.
 
 ## Pull Request Guidelines
 
