@@ -6,6 +6,7 @@ using Azure.Mcp.Core.Services.Azure.Authentication;
 using Azure.Mcp.Core.Services.Azure.Subscription;
 using Azure.Mcp.Core.Services.Azure.Tenant;
 using Azure.Mcp.Core.Services.Caching;
+using Azure.Mcp.Core.Services.Http;
 using Azure.Mcp.Tests;
 using Azure.Mcp.Tests.Client;
 using Azure.Mcp.Tools.AppConfig.Services;
@@ -31,7 +32,9 @@ public class AppConfigCommandTests : CommandTestsBase
         var tokenProvider = new SingleIdentityTokenCredentialProvider(NullLoggerFactory.Instance);
         var tenantService = new TenantService(tokenProvider, cacheService);
         var subscriptionService = new SubscriptionService(cacheService, tenantService);
-        _appConfigService = new AppConfigService(subscriptionService, tenantService, _logger);
+        var httpClientOptions = Microsoft.Extensions.Options.Options.Create(new HttpClientOptions());
+        var httpClientService = new HttpClientService(httpClientOptions);
+        _appConfigService = new AppConfigService(subscriptionService, tenantService, _logger, httpClientService);
     }
 
     [Fact]

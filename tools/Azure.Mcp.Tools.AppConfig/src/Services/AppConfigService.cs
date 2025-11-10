@@ -8,6 +8,8 @@ using Azure.Mcp.Core.Options;
 using Azure.Mcp.Core.Services.Azure;
 using Azure.Mcp.Core.Services.Azure.Subscription;
 using Azure.Mcp.Core.Services.Azure.Tenant;
+using Azure.Mcp.Core.Services.Http;
+using Azure.Core.Pipeline;
 using Azure.Mcp.Tools.AppConfig.Models;
 using Microsoft.Extensions.Logging;
 
@@ -15,10 +17,15 @@ namespace Azure.Mcp.Tools.AppConfig.Services;
 
 using ETag = Core.Models.ETag;
 
-public sealed class AppConfigService(ISubscriptionService subscriptionService, ITenantService tenantService, ILogger<AppConfigService> logger)
+public sealed class AppConfigService(
+    ISubscriptionService subscriptionService,
+    ITenantService tenantService,
+    ILogger<AppConfigService> logger,
+    IHttpClientService httpClientService)
     : BaseAzureResourceService(subscriptionService, tenantService), IAppConfigService
 {
     private readonly ILogger<AppConfigService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly IHttpClientService _httpClientService = httpClientService ?? throw new ArgumentNullException(nameof(httpClientService));
 
     public async Task<List<AppConfigurationAccount>> GetAppConfigAccounts(string subscription, string? tenant = null, RetryPolicyOptions? retryPolicy = null)
     {
@@ -152,6 +159,9 @@ public sealed class AppConfigService(ISubscriptionService subscriptionService, I
         var credential = await GetCredential(tenant);
         var options = new ConfigurationClientOptions();
         AddDefaultPolicies(options);
+
+        var httpClient = _httpClientService.CreateClient(new Uri(endpoint));
+        options.Transport = new HttpClientTransport(httpClient);
 
         return new ConfigurationClient(new Uri(endpoint), credential, options);
     }
