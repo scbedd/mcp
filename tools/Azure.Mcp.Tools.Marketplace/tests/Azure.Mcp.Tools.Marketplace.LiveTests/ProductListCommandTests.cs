@@ -5,6 +5,7 @@ using System.Text.Json;
 using Azure.Mcp.Core.Services.Azure.Authentication;
 using Azure.Mcp.Core.Services.Azure.Tenant;
 using Azure.Mcp.Core.Services.Caching;
+using Azure.Mcp.Core.Services.Http;
 using Azure.Mcp.Tests;
 using Azure.Mcp.Tests.Client;
 using Azure.Mcp.Tools.Marketplace.Services;
@@ -26,7 +27,8 @@ public class ProductListCommandTests : CommandTestsBase
         var memoryCache = new MemoryCache(Microsoft.Extensions.Options.Options.Create(new MemoryCacheOptions()));
         var cacheService = new SingleUserCliCacheService(memoryCache);
         var tokenProvider = new SingleIdentityTokenCredentialProvider(NullLoggerFactory.Instance);
-        var tenantService = new TenantService(tokenProvider, cacheService);
+        var httpClientService = new HttpClientService(Microsoft.Extensions.Options.Options.Create(new HttpClientOptions()));
+        var tenantService = new TenantService(tokenProvider, cacheService, httpClientService);
         _marketplaceService = new MarketplaceService(tenantService);
     }
 

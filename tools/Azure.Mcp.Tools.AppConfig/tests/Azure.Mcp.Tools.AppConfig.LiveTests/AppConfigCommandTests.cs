@@ -28,13 +28,13 @@ public sealed class AppConfigCommandTests : RecordedCommandTestsBase
     public AppConfigCommandTests(ITestOutputHelper output, TestProxyFixture fixture) : base(output, fixture)
     {
         _logger = NullLogger<AppConfigService>.Instance;
-    var memoryCache = new MemoryCache(Microsoft.Extensions.Options.Options.Create(new MemoryCacheOptions()));
+        var memoryCache = new MemoryCache(Microsoft.Extensions.Options.Options.Create(new MemoryCacheOptions()));
         var cacheService = new SingleUserCliCacheService(memoryCache);
         var tokenProvider = new SingleIdentityTokenCredentialProvider(NullLoggerFactory.Instance);
-        var tenantService = new TenantService(tokenProvider, cacheService);
-        var subscriptionService = new SubscriptionService(cacheService, tenantService);
         var httpClientOptions = Microsoft.Extensions.Options.Options.Create(new HttpClientOptions());
         var httpClientService = new HttpClientService(httpClientOptions);
+        var tenantService = new TenantService(tokenProvider, cacheService, httpClientService);
+        var subscriptionService = new SubscriptionService(cacheService, tenantService, httpClientService);
         _appConfigService = new AppConfigService(subscriptionService, tenantService, _logger, httpClientService);
     }
 

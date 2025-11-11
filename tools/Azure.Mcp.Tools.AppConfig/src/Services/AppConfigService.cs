@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using System.Text.Json;
+using Azure.Core.Pipeline;
 using Azure.Data.AppConfiguration;
 using Azure.Mcp.Core.Models.Identity;
 using Azure.Mcp.Core.Options;
@@ -9,7 +10,6 @@ using Azure.Mcp.Core.Services.Azure;
 using Azure.Mcp.Core.Services.Azure.Subscription;
 using Azure.Mcp.Core.Services.Azure.Tenant;
 using Azure.Mcp.Core.Services.Http;
-using Azure.Core.Pipeline;
 using Azure.Mcp.Tools.AppConfig.Models;
 using Microsoft.Extensions.Logging;
 
@@ -22,7 +22,7 @@ public sealed class AppConfigService(
     ITenantService tenantService,
     ILogger<AppConfigService> logger,
     IHttpClientService httpClientService)
-    : BaseAzureResourceService(subscriptionService, tenantService), IAppConfigService
+    : BaseAzureResourceService(subscriptionService, tenantService, httpClientService), IAppConfigService
 {
     private readonly ILogger<AppConfigService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private readonly IHttpClientService _httpClientService = httpClientService ?? throw new ArgumentNullException(nameof(httpClientService));

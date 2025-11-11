@@ -1,6 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+using Azure.Mcp.Core.Extensions;
 using Azure.Mcp.Core.Services.Azure.Authentication;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -48,6 +49,7 @@ public static class TenantServiceCollectionExtensions
         // container to be populated with the correct authentication strategy, such as OBO for
         // running as a remote HTTP MCP service.
         services.AddSingleIdentityTokenCredentialProvider();
+        services.AddHttpClientServices();
 
         services.TryAddSingleton<ITenantService, TenantService>();
         return services;
