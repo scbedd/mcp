@@ -19,12 +19,11 @@ Notably, in the above process, the call of the tool is calling into a prebuilt E
 
 ## Converting a `LiveTest` to a `Recorded` test
 
-copilot to generate this after examining copilot instructions.
 
 ## The sanitization/playback loop
 
 - If a `.livesettings` file exists at root of your `tool`, continue.
-- Ensure that the `TestMode` setting within the `.livesettings.json` is set to `Record`.
+- Update the `TestMode` setting within the `.livesettings.json` alongside each livetests csproj to `Record`.
 - Invoke the livetests.
 - Use `.proxy/Azure.Sdk.Tools.TestProxy(.exe) config locate -a path/to/assets.json` to locate the recordings directory
   - Review recordings for secrets.

@@ -9,6 +9,7 @@ using Azure.Mcp.Core.Services.Caching;
 using Azure.Mcp.Core.Services.Http;
 using Azure.Mcp.Tests;
 using Azure.Mcp.Tests.Client;
+using Azure.Mcp.Tests.Client.Helpers;
 using Azure.Mcp.Tools.AppConfig.Services;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
@@ -17,23 +18,23 @@ using Xunit;
 
 namespace Azure.Mcp.Tools.AppConfig.LiveTests;
 
-public class AppConfigCommandTests : CommandTestsBase
+public sealed class AppConfigCommandTests : RecordedCommandTestsBase
 {
     private const string AccountsKey = "accounts";
     private const string SettingsKey = "settings";
     private readonly AppConfigService _appConfigService;
     private readonly ILogger<AppConfigService> _logger;
 
-    public AppConfigCommandTests(ITestOutputHelper output) : base(output)
+    public AppConfigCommandTests(ITestOutputHelper output, TestProxyFixture fixture) : base(output, fixture)
     {
         _logger = NullLogger<AppConfigService>.Instance;
-        var memoryCache = new MemoryCache(Microsoft.Extensions.Options.Options.Create(new MemoryCacheOptions()));
+    var memoryCache = new MemoryCache(Microsoft.Extensions.Options.Options.Create(new MemoryCacheOptions()));
         var cacheService = new SingleUserCliCacheService(memoryCache);
         var tokenProvider = new SingleIdentityTokenCredentialProvider(NullLoggerFactory.Instance);
         var tenantService = new TenantService(tokenProvider, cacheService);
         var subscriptionService = new SubscriptionService(cacheService, tenantService);
-        var httpClientOptions = Microsoft.Extensions.Options.Options.Create(new HttpClientOptions());
-        var httpClientService = new HttpClientService(httpClientOptions);
+    var httpClientOptions = Microsoft.Extensions.Options.Options.Create(new HttpClientOptions());
+    var httpClientService = new HttpClientService(httpClientOptions);
         _appConfigService = new AppConfigService(subscriptionService, tenantService, _logger, httpClientService);
     }
 
