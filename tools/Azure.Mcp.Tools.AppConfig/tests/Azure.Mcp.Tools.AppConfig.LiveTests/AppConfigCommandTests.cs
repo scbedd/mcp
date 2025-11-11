@@ -33,8 +33,8 @@ public sealed class AppConfigCommandTests : RecordedCommandTestsBase
         var tokenProvider = new SingleIdentityTokenCredentialProvider(NullLoggerFactory.Instance);
         var tenantService = new TenantService(tokenProvider, cacheService);
         var subscriptionService = new SubscriptionService(cacheService, tenantService);
-    var httpClientOptions = Microsoft.Extensions.Options.Options.Create(new HttpClientOptions());
-    var httpClientService = new HttpClientService(httpClientOptions);
+        var httpClientOptions = Microsoft.Extensions.Options.Options.Create(new HttpClientOptions());
+        var httpClientService = new HttpClientService(httpClientOptions);
         _appConfigService = new AppConfigService(subscriptionService, tenantService, _logger, httpClientService);
     }
 
