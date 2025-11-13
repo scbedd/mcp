@@ -24,35 +24,33 @@ internal sealed class RecordedCommandTestHarness(ITestOutputHelper output, TestP
 
     public IReadOnlyDictionary<string, string> Variables => TestVariables;
 
-    public string GetRecordingAbsolutePath(string? displayName)
+    public string GetRecordingAbsolutePath(string displayName)
     {
-        if (string.IsNullOrWhiteSpace(displayName))
-        {
-            throw new ArgumentException("Display name must be provided to resolve recording path.", nameof(displayName));
-        }
-
         var sanitized = RecordingPathResolver.Sanitize(displayName);
-        var relativeDirectory = _pathResolver.GetSessionDirectory(GetType(), variantSuffix: null)
+        var relativeDirectory = PathResolver.GetSessionDirectory(GetType(), variantSuffix: null)
             .Replace('/', Path.DirectorySeparatorChar);
         var fileName = RecordingPathResolver.BuildFileName(sanitized, IsAsync, VersionQualifier);
-        var absoluteDirectory = Path.Combine(_pathResolver.RepositoryRoot, relativeDirectory);
+        var absoluteDirectory = Path.Combine(PathResolver.RepositoryRoot, relativeDirectory);
         Directory.CreateDirectory(absoluteDirectory);
         return Path.Combine(absoluteDirectory, fileName);
     }
 
-    protected override async ValueTask LoadSettingsAsync()
+    protected override ValueTask LoadSettingsAsync()
     {
-        await base.LoadSettingsAsync().ConfigureAwait(false);
+        Settings = new LiveTestSettings
+        {
+            SubscriptionId = "00000000-0000-0000-0000-000000000000",
+            TenantId = "00000000-0000-0000-0000-000000000000",
+            ResourceBaseName = "Sanitized",
+            SubscriptionName = "Sanitized",
+            TenantName = "Sanitized",
+            TestMode = TestMode.Playback
+        };
 
         Settings.TestMode = DesiredMode;
-        Settings.ResourceBaseName = string.IsNullOrWhiteSpace(Settings.ResourceBaseName)
-            ? "RecordedHarness"
-            : Settings.ResourceBaseName;
-        Settings.SettingsDirectory = string.IsNullOrWhiteSpace(Settings.SettingsDirectory)
-            ? _pathResolver.RepositoryRoot
-            : Settings.SettingsDirectory;
-
         TestMode = DesiredMode;
+
+        return ValueTask.CompletedTask;
     }
 
     public void ResetVariables()
@@ -60,19 +58,8 @@ internal sealed class RecordedCommandTestHarness(ITestOutputHelper output, TestP
         TestVariables.Clear();
     }
 
-    [CustomMatcher(IgnoreQueryOrdering = true, CompareBodies = true)]
-    public void PerTestMatcherAttributeAppliesWhenPresent()
+    public string GetRecordingId()
     {
-        // Marker method used so that RecordedCommandTestsBase can locate the CustomMatcherAttribute via reflection.
-    }
-
-    public void GetActiveMatcher(string? recordingId = null)
-    {
-        throw new NotImplementedException();
-    }
-
-    public IEnumerable<string> GetActiveSanitizer(string? recordingId = null)
-    {
-        throw new NotImplementedException();
+        return RecordingId;
     }
 }

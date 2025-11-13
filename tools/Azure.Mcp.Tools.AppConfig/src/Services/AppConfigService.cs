@@ -27,7 +27,7 @@ public sealed class AppConfigService(
     private readonly ILogger<AppConfigService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private readonly IHttpClientService _httpClientService = httpClientService ?? throw new ArgumentNullException(nameof(httpClientService));
 
-    public async Task<List<AppConfigurationAccount>> GetAppConfigAccounts(string subscription, string? tenant = null, RetryPolicyOptions? retryPolicy = null)
+    public async Task<List<AppConfigurationAccount>> GetAppConfigAccounts(string subscription, string? tenant = null, RetryPolicyOptions? retryPolicy = null, CancellationToken cancellationToken = default)
     {
         ValidateRequiredParameters((nameof(subscription), subscription));
 
@@ -39,7 +39,7 @@ public sealed class AppConfigService(
                 subscription,
                 retryPolicy,
                 ConvertToAppConfigurationAccountModel,
-                cancellationToken: CancellationToken.None);
+                cancellationToken: cancellationToken);
 
             return accounts;
         }
