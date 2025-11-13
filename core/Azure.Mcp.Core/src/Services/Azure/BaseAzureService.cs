@@ -4,8 +4,10 @@
 using System.Reflection;
 using System.Runtime.Versioning;
 using Azure.Core;
+using Azure.Core.Pipeline;
 using Azure.Mcp.Core.Options;
 using Azure.Mcp.Core.Services.Azure.Tenant;
+using Azure.Mcp.Core.Services.Http;
 using Azure.ResourceManager;
 
 namespace Azure.Mcp.Core.Services.Azure;
@@ -16,6 +18,7 @@ public abstract class BaseAzureService
     public static readonly string DefaultUserAgent;
 
     private readonly ITenantService? _tenantServiceDoNotUseDirectly;
+    private IHttpClientService? _httpClientService;
 
     static BaseAzureService()
     {
@@ -34,10 +37,11 @@ public abstract class BaseAzureService
     /// <param name="tenantService">
     /// An <see cref="ITenantService"/> used for Azure API calls.
     /// </param>
-    protected BaseAzureService(ITenantService tenantService)
+    protected BaseAzureService(ITenantService tenantService, IHttpClientService? httpClientService = null)
     {
         ArgumentNullException.ThrowIfNull(tenantService, nameof(tenantService));
         TenantService = tenantService;
+        _httpClientService = httpClientService;
     }
 
     /// <summary>
@@ -71,6 +75,15 @@ public abstract class BaseAzureService
         {
             _tenantServiceDoNotUseDirectly = value;
         }
+    }
+
+    /// <summary>
+    /// Initializes the HTTP client service for derived classes that invoke the parameterless constructor.
+    /// </summary>
+    /// <param name="httpClientService">The HTTP client service instance to use.</param>
+    protected void InitializeHttpClientService(IHttpClientService httpClientService)
+    {
+        _httpClientService = httpClientService ?? throw new ArgumentNullException(nameof(httpClientService));
     }
 
     /// <summary>
@@ -122,6 +135,18 @@ public abstract class BaseAzureService
     {
         clientOptions.AddPolicy(s_sharedUserAgentPolicy, HttpPipelinePosition.BeforeTransport);
 
+        return clientOptions;
+    }
+
+    protected T ConfigureHttpClientTransport<T>(T clientOptions) where T : ClientOptions
+    {
+        if (_httpClientService == null || clientOptions.Transport is HttpClientTransport)
+        {
+            return clientOptions;
+        }
+
+        var httpClient = _httpClientService.CreateClient();
+        clientOptions.Transport = new HttpClientTransport(httpClient);
         return clientOptions;
     }
 
@@ -179,7 +204,9 @@ public abstract class BaseAzureService
         {
             TokenCredential credential = await GetCredential(tenantId, cancellationToken);
             ArmClientOptions options = armClientOptions ?? new();
-            ConfigureRetryPolicy(AddDefaultPolicies(options), retryPolicy);
+            options = AddDefaultPolicies(options);
+            options = ConfigureRetryPolicy(options, retryPolicy);
+            options = ConfigureHttpClientTransport(options);
 
             ArmClient armClient = new(credential, defaultSubscriptionId: default, options);
             return armClient;

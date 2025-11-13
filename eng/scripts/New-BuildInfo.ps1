@@ -81,7 +81,7 @@ function Get-LatestMarketplaceVersion {
         [string]$ExtensionId,
         [int]$MajorVersion
     )
-    
+
     try {
         $marketplaceUrl = "https://marketplace.visualstudio.com/_apis/public/gallery/extensionquery?api-version=7.1-preview.1"
         $body = @{
@@ -113,7 +113,7 @@ function Get-LatestMarketplaceVersion {
                         Patch = [int]$Matches[1]
                     }
                 }
-                
+
                 if ($matchingVersions) {
                     $maxPatch = ($matchingVersions | Measure-Object -Property Patch -Maximum).Maximum
                     return [PSCustomObject]@{
@@ -281,6 +281,7 @@ function Get-PathsToTest {
         $rootedTestResourcesPath = "$RepoRoot/$testResourcesPath"
         $hasTestResources = Test-Path "$rootedTestResourcesPath/test-resources.bicep"
         $hasLiveTests = (Get-ChildItem $rootedTestResourcesPath -Filter '*.LiveTests.csproj' -Recurse).Count -gt 0
+        $hasRecordedTests = $hasLiveTests -and (Get-ChildItem $rootedTestResourcesPath -Filter 'assets.json' -Recurse).Count -gt 0
         $hasUnitTests = (Get-ChildItem $rootedTestResourcesPath -Filter '*.UnitTests.csproj' -Recurse).Count -gt 0
 
         $pathsToTest += @{
@@ -289,6 +290,7 @@ function Get-PathsToTest {
             testResourcesPath = $hasTestResources ? $testResourcesPath : $null
             hasLiveTests = $hasLiveTests
             hasUnitTests = $hasUnitTests
+            hasRecordedTests = $hasRecordedTests
         }
     }
 
@@ -372,7 +374,7 @@ function Get-ServerDetails {
         elseif ($PublishTarget -eq 'public') {
             # Check if this is X.0.0-beta.Y series
             $isBetaSeries = $version.Minor -eq 0 -and $version.Patch -eq 0 -and $version.PrereleaseLabel -eq 'beta'
-            
+
             if ($isBetaSeries) {
                 # Map X.0.0-beta.Y -> VSIX X.0.Y (prerelease)
                 $vsixVersion = "$($version.Major).$($version.Minor).$($version.PrereleaseNumber)"
@@ -382,17 +384,17 @@ function Get-ServerDetails {
                 # For all non-beta versions, calculate next patch version from marketplace
                 $vscodePath = "$RepoRoot/servers/$serverName/vscode"
                 $packageJsonPath = "$vscodePath/package.json"
-                
+
                 if (Test-Path $packageJsonPath) {
                     $packageJson = Get-Content $packageJsonPath -Raw | ConvertFrom-Json
                     $publisherId = $packageJson.publisher
                     $extensionName = $packageJson.name
-                    
+
                     if ($publisherId -and $extensionName) {
                         Write-Host "Fetching latest marketplace version for $publisherId.$extensionName with major version $($version.Major)..." -ForegroundColor Cyan
-                        
+
                         $marketplaceInfo = Get-LatestMarketplaceVersion -PublisherId $publisherId -ExtensionId $extensionName -MajorVersion $version.Major
-                        
+
                         if ($marketplaceInfo) {
                             # Use next patch version from marketplace
                             $vsixVersion = "$($version.Major).0.$($marketplaceInfo.NextPatch)"

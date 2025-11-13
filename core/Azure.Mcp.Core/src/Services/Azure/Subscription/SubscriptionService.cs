@@ -4,12 +4,13 @@
 using Azure.Mcp.Core.Options;
 using Azure.Mcp.Core.Services.Azure.Tenant;
 using Azure.Mcp.Core.Services.Caching;
+using Azure.Mcp.Core.Services.Http;
 using Azure.ResourceManager.Resources;
 
 namespace Azure.Mcp.Core.Services.Azure.Subscription;
 
-public class SubscriptionService(ICacheService cacheService, ITenantService tenantService)
-    : BaseAzureService(tenantService), ISubscriptionService
+public class SubscriptionService(ICacheService cacheService, ITenantService tenantService, IHttpClientService? httpClientService = null)
+    : BaseAzureService(tenantService, httpClientService), ISubscriptionService
 {
     private readonly ICacheService _cacheService = cacheService ?? throw new ArgumentNullException(nameof(cacheService));
     private const string CacheGroup = "subscription";

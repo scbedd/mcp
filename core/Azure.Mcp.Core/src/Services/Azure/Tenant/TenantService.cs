@@ -4,6 +4,7 @@
 using Azure.Core;
 using Azure.Mcp.Core.Services.Azure.Authentication;
 using Azure.Mcp.Core.Services.Caching;
+using Azure.Mcp.Core.Services.Http;
 using Azure.ResourceManager;
 using Azure.ResourceManager.Resources;
 
@@ -19,10 +20,12 @@ public class TenantService : BaseAzureService, ITenantService
 
     public TenantService(
         IAzureTokenCredentialProvider credentialProvider,
-        ICacheService cacheService)
+        ICacheService cacheService,
+        IHttpClientService httpClientService)
     {
         _credentialProvider = credentialProvider;
         _cacheService = cacheService ?? throw new ArgumentNullException(nameof(cacheService));
+        InitializeHttpClientService(httpClientService);
         TenantService = this;
     }
 
@@ -39,7 +42,7 @@ public class TenantService : BaseAzureService, ITenantService
         // If not in cache, fetch from Azure
         var results = new List<TenantResource>();
 
-        var options = AddDefaultPolicies(new ArmClientOptions());
+        var options = ConfigureHttpClientTransport(AddDefaultPolicies(new ArmClientOptions()));
         var client = new ArmClient(await GetCredential(), default, options);
 
         await foreach (var tenant in client.GetTenants())

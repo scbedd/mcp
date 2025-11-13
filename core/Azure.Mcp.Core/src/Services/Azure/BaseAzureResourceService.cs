@@ -7,6 +7,7 @@ using Azure.Core;
 using Azure.Mcp.Core.Options;
 using Azure.Mcp.Core.Services.Azure.Subscription;
 using Azure.Mcp.Core.Services.Azure.Tenant;
+using Azure.Mcp.Core.Services.Http;
 using Azure.ResourceManager;
 using Azure.ResourceManager.ResourceGraph;
 using Azure.ResourceManager.ResourceGraph.Models;
@@ -20,8 +21,9 @@ namespace Azure.Mcp.Core.Services.Azure;
 /// </summary>
 public abstract class BaseAzureResourceService(
     ISubscriptionService subscriptionService,
-    ITenantService tenantService)
-    : BaseAzureService(tenantService)
+    ITenantService tenantService,
+    IHttpClientService? httpClientService = null)
+    : BaseAzureService(tenantService, httpClientService)
 {
     private readonly ISubscriptionService _subscriptionService = subscriptionService ?? throw new ArgumentNullException(nameof(subscriptionService));
 

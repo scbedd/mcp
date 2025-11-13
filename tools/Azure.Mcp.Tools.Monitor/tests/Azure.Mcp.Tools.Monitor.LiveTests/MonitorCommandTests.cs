@@ -41,12 +41,12 @@ public class MonitorCommandTests(ITestOutputHelper output) : CommandTestsBase(ou
         var memoryCache = new MemoryCache(Microsoft.Extensions.Options.Options.Create(new MemoryCacheOptions()));
         var cacheService = new SingleUserCliCacheService(memoryCache);
         var tokenProvider = new SingleIdentityTokenCredentialProvider(NullLoggerFactory.Instance);
-        var tenantService = new TenantService(tokenProvider, cacheService);
-        var subscriptionService = new SubscriptionService(cacheService, tenantService);
-        var resourceGroupService = new ResourceGroupService(cacheService, subscriptionService, tenantService);
-        var resourceResolverService = new ResourceResolverService(subscriptionService, tenantService);
         var httpClientOptions = new HttpClientOptions();
         var httpClientService = new HttpClientService(Microsoft.Extensions.Options.Options.Create(httpClientOptions));
+        var tenantService = new TenantService(tokenProvider, cacheService, httpClientService);
+        var subscriptionService = new SubscriptionService(cacheService, tenantService, httpClientService);
+        var resourceGroupService = new ResourceGroupService(cacheService, subscriptionService, tenantService);
+        var resourceResolverService = new ResourceResolverService(subscriptionService, tenantService);
         return new MonitorService(subscriptionService, tenantService, resourceGroupService, resourceResolverService, httpClientService);
     }
 
