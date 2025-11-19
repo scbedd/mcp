@@ -6,8 +6,10 @@ using Azure.Mcp.Core.Services.Azure.Authentication;
 using Azure.Mcp.Core.Services.Azure.Subscription;
 using Azure.Mcp.Core.Services.Azure.Tenant;
 using Azure.Mcp.Core.Services.Caching;
+using Azure.Mcp.Core.Services.Http;
 using Azure.Mcp.Tests;
 using Azure.Mcp.Tests.Client;
+using Azure.Mcp.Tests.Client.Helpers;
 using Azure.Mcp.Tools.AppConfig.Services;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
@@ -16,22 +18,24 @@ using Xunit;
 
 namespace Azure.Mcp.Tools.AppConfig.LiveTests;
 
-public class AppConfigCommandTests : CommandTestsBase
+public sealed class AppConfigCommandTests : RecordedCommandTestsBase
 {
     private const string AccountsKey = "accounts";
     private const string SettingsKey = "settings";
     private readonly AppConfigService _appConfigService;
     private readonly ILogger<AppConfigService> _logger;
 
-    public AppConfigCommandTests(ITestOutputHelper output) : base(output)
+    public AppConfigCommandTests(ITestOutputHelper output, TestProxyFixture fixture) : base(output, fixture)
     {
         _logger = NullLogger<AppConfigService>.Instance;
         var memoryCache = new MemoryCache(Microsoft.Extensions.Options.Options.Create(new MemoryCacheOptions()));
         var cacheService = new SingleUserCliCacheService(memoryCache);
         var tokenProvider = new SingleIdentityTokenCredentialProvider(NullLoggerFactory.Instance);
-        var tenantService = new TenantService(tokenProvider, cacheService);
-        var subscriptionService = new SubscriptionService(cacheService, tenantService);
-        _appConfigService = new AppConfigService(subscriptionService, tenantService, _logger);
+        var httpClientOptions = Microsoft.Extensions.Options.Options.Create(new HttpClientOptions());
+        var httpClientService = new HttpClientService(httpClientOptions);
+        var tenantService = new TenantService(tokenProvider, cacheService, httpClientService);
+        var subscriptionService = new SubscriptionService(cacheService, tenantService, httpClientService);
+        _appConfigService = new AppConfigService(subscriptionService, tenantService, _logger, httpClientService);
     }
 
     [Fact]
@@ -61,18 +65,8 @@ public class AppConfigCommandTests : CommandTestsBase
         const string key1 = "bar";
         const string value1 = "bar-value";
 
-        await _appConfigService.SetKeyValue(
-            Settings.ResourceBaseName,
-            key0,
-            value0,
-            Settings.SubscriptionId,
-            cancellationToken: TestContext.Current.CancellationToken);
-        await _appConfigService.SetKeyValue(
-            Settings.ResourceBaseName,
-            key1,
-            value1,
-            Settings.SubscriptionId,
-            cancellationToken: TestContext.Current.CancellationToken);
+        await _appConfigService.SetKeyValue(Settings.ResourceBaseName, key0, value0, Settings.SubscriptionId);
+        await _appConfigService.SetKeyValue(Settings.ResourceBaseName, key1, value1, Settings.SubscriptionId);
 
         // act
         var result = await CallToolAsync(
@@ -103,13 +97,7 @@ public class AppConfigCommandTests : CommandTestsBase
         const string key = "foo1";
         const string value = "foo-value";
         const string label = "foobar";
-        await _appConfigService.SetKeyValue(
-            Settings.ResourceBaseName,
-            key,
-            value,
-            Settings.SubscriptionId,
-            label: label,
-            cancellationToken: TestContext.Current.CancellationToken);
+        await _appConfigService.SetKeyValue(Settings.ResourceBaseName, key, value, Settings.SubscriptionId, label: label);
 
         // act
         var result = await CallToolAsync(
@@ -143,25 +131,13 @@ public class AppConfigCommandTests : CommandTestsBase
         try
         {
             // if it exists, unlock it
-            await _appConfigService.SetKeyValueLockState(
-                Settings.ResourceBaseName,
-                key,
-                false,
-                Settings.SubscriptionId,
-                label: label,
-                cancellationToken: TestContext.Current.CancellationToken);
+            await _appConfigService.SetKeyValueLockState(Settings.ResourceBaseName, key, false, Settings.SubscriptionId, label: label);
         }
         catch
         {
         }
         // make sure it exists
-        await _appConfigService.SetKeyValue(
-            Settings.ResourceBaseName,
-            key,
-            value,
-            Settings.SubscriptionId,
-            label: label,
-            cancellationToken: TestContext.Current.CancellationToken);
+        await _appConfigService.SetKeyValue(Settings.ResourceBaseName, key, value, Settings.SubscriptionId, label: label);
 
         // act
         var result = await CallToolAsync(
@@ -176,13 +152,7 @@ public class AppConfigCommandTests : CommandTestsBase
             });
 
         // assert
-        await Assert.ThrowsAnyAsync<Exception>(() => _appConfigService.SetKeyValue(
-            Settings.ResourceBaseName,
-            key,
-            newValue,
-            Settings.SubscriptionId,
-            label: label,
-            cancellationToken: TestContext.Current.CancellationToken));
+        await Assert.ThrowsAnyAsync<Exception>(() => _appConfigService.SetKeyValue(Settings.ResourceBaseName, key, newValue, Settings.SubscriptionId, label: label));
     }
 
     [Fact]
@@ -195,13 +165,13 @@ public class AppConfigCommandTests : CommandTestsBase
         try
         {
             // if it exists, unlock it
-            await _appConfigService.SetKeyValueLockState(Settings.ResourceBaseName, key, false, Settings.SubscriptionId, cancellationToken: TestContext.Current.CancellationToken);
+            await _appConfigService.SetKeyValueLockState(Settings.ResourceBaseName, key, false, Settings.SubscriptionId);
         }
         catch
         {
         }
         // make sure it exists
-        await _appConfigService.SetKeyValue(Settings.ResourceBaseName, key, value, Settings.SubscriptionId, cancellationToken: TestContext.Current.CancellationToken);
+        await _appConfigService.SetKeyValue(Settings.ResourceBaseName, key, value, Settings.SubscriptionId);
 
         // act
         var result = await CallToolAsync(
@@ -215,7 +185,7 @@ public class AppConfigCommandTests : CommandTestsBase
             });
 
         // assert
-        await Assert.ThrowsAnyAsync<Exception>(() => _appConfigService.SetKeyValue(Settings.ResourceBaseName, key, newValue, Settings.SubscriptionId, cancellationToken: TestContext.Current.CancellationToken));
+        await Assert.ThrowsAnyAsync<Exception>(() => _appConfigService.SetKeyValue(Settings.ResourceBaseName, key, newValue, Settings.SubscriptionId));
     }
 
     [Fact]
@@ -229,14 +199,14 @@ public class AppConfigCommandTests : CommandTestsBase
         try
         {
             // if it exists, unlock it
-            await _appConfigService.SetKeyValueLockState(Settings.ResourceBaseName, key, false, Settings.SubscriptionId, label: label, cancellationToken: TestContext.Current.CancellationToken);
+            await _appConfigService.SetKeyValueLockState(Settings.ResourceBaseName, key, false, Settings.SubscriptionId, label: label);
         }
         catch
         {
         }
         // make sure it exists
-        await _appConfigService.SetKeyValue(Settings.ResourceBaseName, key, value, Settings.SubscriptionId, label: label, cancellationToken: TestContext.Current.CancellationToken);
-        await _appConfigService.SetKeyValueLockState(Settings.ResourceBaseName, key, true, Settings.SubscriptionId, label: label, cancellationToken: TestContext.Current.CancellationToken);
+        await _appConfigService.SetKeyValue(Settings.ResourceBaseName, key, value, Settings.SubscriptionId, label: label);
+        await _appConfigService.SetKeyValueLockState(Settings.ResourceBaseName, key, true, Settings.SubscriptionId, label: label);
 
         // act
         _ = await CallToolAsync(
@@ -253,7 +223,7 @@ public class AppConfigCommandTests : CommandTestsBase
         // assert
         try
         {
-            await _appConfigService.SetKeyValue(Settings.ResourceBaseName, key, newValue, Settings.SubscriptionId, label: label, cancellationToken: TestContext.Current.CancellationToken);
+            await _appConfigService.SetKeyValue(Settings.ResourceBaseName, key, newValue, Settings.SubscriptionId, label: label);
         }
         catch (Exception ex)
         {
@@ -271,14 +241,14 @@ public class AppConfigCommandTests : CommandTestsBase
         try
         {
             // if it exists, unlock it
-            await _appConfigService.SetKeyValueLockState(Settings.ResourceBaseName, key, false, Settings.SubscriptionId, cancellationToken: TestContext.Current.CancellationToken);
+            await _appConfigService.SetKeyValueLockState(Settings.ResourceBaseName, key, false, Settings.SubscriptionId);
         }
         catch
         {
         }
         // make sure it exists
-        await _appConfigService.SetKeyValue(Settings.ResourceBaseName, key, value, Settings.SubscriptionId, cancellationToken: TestContext.Current.CancellationToken);
-        await _appConfigService.SetKeyValueLockState(Settings.ResourceBaseName, key, true, Settings.SubscriptionId, cancellationToken: TestContext.Current.CancellationToken);
+        await _appConfigService.SetKeyValue(Settings.ResourceBaseName, key, value, Settings.SubscriptionId);
+        await _appConfigService.SetKeyValueLockState(Settings.ResourceBaseName, key, true, Settings.SubscriptionId);
 
         // act
         _ = await CallToolAsync(
@@ -294,7 +264,7 @@ public class AppConfigCommandTests : CommandTestsBase
         // assert
         try
         {
-            await _appConfigService.SetKeyValue(Settings.ResourceBaseName, key, newValue, Settings.SubscriptionId, cancellationToken: TestContext.Current.CancellationToken);
+            await _appConfigService.SetKeyValue(Settings.ResourceBaseName, key, newValue, Settings.SubscriptionId);
         }
         catch (Exception ex)
         {
@@ -309,7 +279,7 @@ public class AppConfigCommandTests : CommandTestsBase
         const string key = "foo6";
         const string value = "foo-value";
         const string label = "staging";
-        await _appConfigService.SetKeyValue(Settings.ResourceBaseName, key, value, Settings.SubscriptionId, label: label, cancellationToken: TestContext.Current.CancellationToken);
+        await _appConfigService.SetKeyValue(Settings.ResourceBaseName, key, value, Settings.SubscriptionId, label: label);
 
         // act
         var result = await CallToolAsync(
@@ -440,15 +410,13 @@ public class AppConfigCommandTests : CommandTestsBase
            key,
            value,
            Settings.SubscriptionId,
-           contentType: contentType,
-           cancellationToken: TestContext.Current.CancellationToken);
+           contentType: contentType);
 
         // act - get key-value to verify content type was preserved
         var settings = await _appConfigService.GetKeyValues(
             Settings.ResourceBaseName,
             Settings.SubscriptionId,
-            key,
-            cancellationToken: TestContext.Current.CancellationToken);
+            key);
 
         // assert - verify content type was properly set and retrieved
         Assert.Single(settings);
@@ -569,4 +537,3 @@ public class AppConfigCommandTests : CommandTestsBase
         }
     }
 }
-
