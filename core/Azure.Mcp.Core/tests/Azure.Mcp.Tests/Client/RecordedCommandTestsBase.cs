@@ -229,6 +229,12 @@ public abstract class RecordedCommandTestsBase(ITestOutputHelper output, TestPro
                 Regex = Settings.ResourceBaseName,
                 Value = "Sanitized",
             }));
+            // sanitize our subscription id by default
+            GeneralRegexSanitizers.Add(new GeneralRegexSanitizer(new GeneralRegexSanitizerBody()
+            {
+                Regex = Settings.SubscriptionId,
+                Value = "00000000-0000-0000-0000-000000000000",
+            }));
         }
     }
 
