@@ -11,6 +11,7 @@ using Azure.Mcp.Core.Services.Http;
 using Azure.Mcp.Tests;
 using Azure.Mcp.Tests.Client;
 using Azure.Mcp.Tests.Client.Helpers;
+using Azure.Mcp.Tests.Generated.Models;
 using Azure.Mcp.Tools.AppConfig.Services;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
@@ -39,6 +40,15 @@ public class AppConfigCommandTests : RecordedCommandTestsBase
         var subscriptionService = new SubscriptionService(cacheService, tenantService);
         _appConfigService = new AppConfigService(subscriptionService, tenantService, _logger, httpClientService);
     }
+
+    public override List<BodyRegexSanitizer> BodyRegexSanitizers => new()
+    {
+        new BodyRegexSanitizer(new BodyRegexSanitizerBody() {
+          Regex = "\"domains\"\\s*:\\s*\\[(?s)(?<domains>.*?)\\]",
+          GroupForReplace = "domains",
+          Value = "\"contoso.com\""
+        })
+    };
 
     [Fact]
     public async Task Should_list_appconfig_accounts()
