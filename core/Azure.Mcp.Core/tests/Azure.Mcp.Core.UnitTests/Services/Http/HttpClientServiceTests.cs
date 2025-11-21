@@ -1,8 +1,12 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+using System;
 using Azure.Mcp.Core.Areas.Server.Options;
+using Azure.Mcp.Core.Extensions;
 using Azure.Mcp.Core.Services.Http;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Xunit;
 
 namespace Azure.Mcp.Core.UnitTests.Services.Http;
@@ -10,27 +14,31 @@ namespace Azure.Mcp.Core.UnitTests.Services.Http;
 public class HttpClientServiceTests
 {
     [Fact]
+    public void Constructor_WithNullFactory_ThrowsArgumentNullException()
+    {
+        var options = Options.Create(new HttpClientOptions());
+        Assert.Throws<ArgumentNullException>(() => new HttpClientService(null!, options));
+    }
+
+    [Fact]
     public void Constructor_WithNullOptions_ThrowsArgumentNullException()
     {
-        // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => new HttpClientService(null!, null!));
+        var services = new ServiceCollection();
+        services.AddHttpClient();
+        using var provider = services.BuildServiceProvider();
+        var factory = provider.GetRequiredService<IHttpClientFactory>();
+
+        Assert.Throws<ArgumentNullException>(() => new HttpClientService(factory, null!));
     }
 
     [Fact]
     public void DefaultClient_ReturnsConfiguredHttpClient()
     {
-        // Arrange
-        var options = new HttpClientOptions
-        {
-            DefaultTimeout = TimeSpan.FromSeconds(30),
-        };
-        var optionsWrapper = Microsoft.Extensions.Options.Options.Create(options);
-        using var service = new HttpClientService(optionsWrapper, null!);
+        using var provider = CreateServiceProvider(options => options.DefaultTimeout = TimeSpan.FromSeconds(30));
+        var service = provider.GetRequiredService<IHttpClientService>();
 
-        // Act
         var client = service.DefaultClient;
 
-        // Assert
         Assert.NotNull(client);
         Assert.Equal(TimeSpan.FromSeconds(30), client.Timeout);
     }
@@ -38,16 +46,12 @@ public class HttpClientServiceTests
     [Fact]
     public void CreateClient_WithBaseAddress_ReturnsClientWithBaseAddress()
     {
-        // Arrange
-        var options = new HttpClientOptions();
-        var optionsWrapper = Microsoft.Extensions.Options.Options.Create(options);
-        using var service = new HttpClientService(optionsWrapper, null!);
+        using var provider = CreateServiceProvider();
+        var service = provider.GetRequiredService<IHttpClientService>();
         var baseAddress = new Uri("https://example.com");
 
-        // Act
         using var client = service.CreateClient(baseAddress);
 
-        // Assert
         Assert.NotNull(client);
         Assert.Equal(baseAddress, client.BaseAddress);
     }
@@ -55,19 +59,12 @@ public class HttpClientServiceTests
     [Fact]
     public void CreateClient_WithConfigureAction_AppliesConfiguration()
     {
-        // Arrange
-        var options = new HttpClientOptions();
-        var optionsWrapper = Microsoft.Extensions.Options.Options.Create(options);
-        using var service = new HttpClientService(optionsWrapper, null!);
+        using var provider = CreateServiceProvider();
+        var service = provider.GetRequiredService<IHttpClientService>();
         var baseAddress = new Uri("https://example.com");
 
-        // Act
-        using var client = service.CreateClient(baseAddress, c =>
-        {
-            c.DefaultRequestHeaders.Add("Custom-Header", "CustomValue");
-        });
+        using var client = service.CreateClient(baseAddress, c => c.DefaultRequestHeaders.Add("Custom-Header", "CustomValue"));
 
-        // Assert
         Assert.NotNull(client);
         Assert.Equal(baseAddress, client.BaseAddress);
         Assert.True(client.DefaultRequestHeaders.Contains("Custom-Header"));
@@ -76,81 +73,80 @@ public class HttpClientServiceTests
     [Fact]
     public void CreateClient_WithProxyConfiguration_CreatesProxyEnabledClient()
     {
-        // Arrange
-        var options = new HttpClientOptions
+        using var provider = CreateServiceProvider(options =>
         {
-            AllProxy = "http://proxy.example.com:8080",
-            NoProxy = "localhost,127.0.0.1"
-        };
-        var optionsWrapper = Microsoft.Extensions.Options.Options.Create(options);
-        using var service = new HttpClientService(optionsWrapper, null!);
+            options.AllProxy = "http://proxy.example.com:8080";
+            options.NoProxy = "localhost,127.0.0.1";
+        });
 
-        // Act
+        var service = provider.GetRequiredService<IHttpClientService>();
+
         using var client = service.CreateClient();
 
-        // Assert
         Assert.NotNull(client);
-        // Note: We can't easily test the proxy configuration without reflection
-        // or making the handler accessible, but this verifies the client is created
     }
 
     [Fact]
     public void Dispose_DisposesDefaultClient()
     {
-        // Arrange
-        var options = new HttpClientOptions();
-        var optionsWrapper = Microsoft.Extensions.Options.Options.Create(options);
-        var service = new HttpClientService(optionsWrapper, null!);
-        var client = service.DefaultClient; // Force creation
+        using var provider = CreateServiceProvider();
+        var service = (HttpClientService)provider.GetRequiredService<IHttpClientService>();
+        _ = service.DefaultClient;
 
-        // Act
         service.Dispose();
 
-        // Assert
         Assert.Throws<ObjectDisposedException>(() => service.CreateClient());
     }
 
     [Fact]
     public void UserAgent_IsSetCorrectly()
     {
-        // Arrange
-        var options = new HttpClientOptions();
-        var optionsWrapper = Microsoft.Extensions.Options.Options.Create(options);
         var serviceStartOptions = new ServiceStartOptions
         {
-            Transport = "http"
+            Transport = TransportTypes.Http
         };
-        var serviceStartOptionsWrapper = Microsoft.Extensions.Options.Options.Create(serviceStartOptions);
-        var service = new HttpClientService(optionsWrapper, serviceStartOptionsWrapper);
-        var client = service.DefaultClient;
 
-        // Act
-        var userAgent = client.DefaultRequestHeaders.UserAgent;
+        using var provider = CreateServiceProvider(
+            configure: null,
+            serviceStartOptions: serviceStartOptions);
 
-        // Assert
-        Assert.Contains("azmcp-http/", userAgent.ToString());
+        var service = provider.GetRequiredService<IHttpClientService>();
+        var userAgent = service.DefaultClient.DefaultRequestHeaders.UserAgent.ToString();
+
+        Assert.Contains("azmcp-http/", userAgent);
     }
 
     [Fact]
-    public void UserAgent_UserAgentFromHttpClientOptionsIsIgnored()
+    public void UserAgent_IgnoresHttpClientOptionsDefaultUserAgent()
     {
-        // Arrange
-        var options = new HttpClientOptions();
-        options.DefaultUserAgent = "CustomAgent/1.0";
-        var optionsWrapper = Microsoft.Extensions.Options.Options.Create(options);
         var serviceStartOptions = new ServiceStartOptions
         {
-            Transport = "http"
+            Transport = TransportTypes.Http
         };
-        var serviceStartOptionsWrapper = Microsoft.Extensions.Options.Options.Create(serviceStartOptions);
-        var service = new HttpClientService(optionsWrapper, serviceStartOptionsWrapper);
-        var client = service.DefaultClient;
 
-        // Act
-        var userAgent = client.DefaultRequestHeaders.UserAgent;
+        using var provider = CreateServiceProvider(
+            options => options.DefaultUserAgent = "CustomAgent/1.0",
+            serviceStartOptions: serviceStartOptions);
 
-        // Assert
-        Assert.Contains("azmcp-http/", userAgent.ToString());
+        var service = provider.GetRequiredService<IHttpClientService>();
+        var userAgent = service.DefaultClient.DefaultRequestHeaders.UserAgent.ToString();
+
+        Assert.Contains("azmcp-http/", userAgent);
+        Assert.DoesNotContain("CustomAgent/1.0", userAgent);
     }
 
+    private static ServiceProvider CreateServiceProvider(
+        Action<HttpClientOptions>? configure = null,
+        ServiceStartOptions? serviceStartOptions = null)
+    {
+        var services = new ServiceCollection();
+        services.AddHttpClientServices(options => configure?.Invoke(options));
+
+        if (serviceStartOptions != null)
+        {
+            services.AddSingleton<IOptions<ServiceStartOptions>>(Options.Create(serviceStartOptions));
+        }
+
+        return services.BuildServiceProvider();
+    }
 }

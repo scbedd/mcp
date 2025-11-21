@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using System.ClientModel.Primitives;
+using System.Net.Http;
 using System.Text.Json.Serialization.Metadata;
 using Azure.Core;
 using Azure.Mcp.Core.Options;
@@ -20,8 +21,9 @@ namespace Azure.Mcp.Core.Services.Azure;
 /// </summary>
 public abstract class BaseAzureResourceService(
     ISubscriptionService subscriptionService,
-    ITenantService tenantService)
-    : BaseAzureService(tenantService)
+    ITenantService tenantService,
+    IHttpClientFactory? httpClientFactory = null)
+    : BaseAzureService(tenantService, httpClientFactory)
 {
     private readonly ISubscriptionService _subscriptionService = subscriptionService ?? throw new ArgumentNullException(nameof(subscriptionService));
 

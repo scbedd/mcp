@@ -1,10 +1,8 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-using System.ClientModel.Primitives;
-using System.Net;
-using System.Reflection;
-using System.Runtime.Versioning;
+using System;
+using System.Net.Http;
 using Azure.Mcp.Core.Areas.Server.Options;
 using Microsoft.Extensions.Options;
 
@@ -15,23 +13,22 @@ namespace Azure.Mcp.Core.Services.Http;
 /// </summary>
 public sealed class HttpClientService : IHttpClientService, IDisposable
 {
-    private readonly HttpClientOptions _options;
+    internal const string DefaultClientName = "AzureMcp.Http.Default";
+
+    private readonly IHttpClientFactory _httpClientFactory;
     private readonly Lazy<HttpClient> _defaultClient;
     private bool _disposed;
-    private string UserAgent { get; }
 
-    public HttpClientService(IOptions<HttpClientOptions> options, IOptions<ServiceStartOptions> serviceStartOptions)
+    public HttpClientService(
+        IHttpClientFactory httpClientFactory,
+        IOptions<HttpClientOptions> options,
+        IOptions<ServiceStartOptions>? serviceStartOptions = null)
     {
-        _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
-        _defaultClient = new Lazy<HttpClient>(() => CreateClientInternal());
+        _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
+        ArgumentNullException.ThrowIfNull(options);
+        _ = serviceStartOptions; // intentionally unused; resolved for compatibility with legacy constructors
 
-        var assembly = typeof(HttpClientService).Assembly;
-        var version = assembly.GetCustomAttribute<AssemblyFileVersionAttribute>()?.Version ?? "unknown";
-        var framework = assembly.GetCustomAttribute<TargetFrameworkAttribute>()?.FrameworkName ?? "unknown";
-        var platform = System.Runtime.InteropServices.RuntimeInformation.OSDescription;
-
-        var transport = serviceStartOptions?.Value.Transport ?? TransportTypes.StdIo;
-        UserAgent = $"azmcp/{version} azmcp-{transport}/{version} ({framework}; {platform})";
+        _defaultClient = new Lazy<HttpClient>(() => _httpClientFactory.CreateClient(DefaultClientName));
     }
 
     /// <inheritdoc />
@@ -45,7 +42,7 @@ public sealed class HttpClientService : IHttpClientService, IDisposable
             throw new ObjectDisposedException(nameof(HttpClientService));
         }
 
-        var client = CreateClientInternal();
+        var client = _httpClientFactory.CreateClient(DefaultClientName);
         if (baseAddress != null)
         {
             client.BaseAddress = baseAddress;
@@ -61,124 +58,6 @@ public sealed class HttpClientService : IHttpClientService, IDisposable
         var client = CreateClient(baseAddress);
         configureClient(client);
         return client;
-    }
-
-    private HttpClient CreateClientInternal()
-    {
-        var handler = CreateHttpClientHandler();
-
-#if DEBUG
-        // If a TEST_PROXY_URL is configured, insert RecordingRedirectHandler as the last delegating handler
-        var testProxyUrl = Environment.GetEnvironmentVariable("TEST_PROXY_URL");
-        Console.WriteLine("Using test proxy URL: " + testProxyUrl);
-        HttpMessageHandler pipeline = handler;
-        if (!string.IsNullOrWhiteSpace(testProxyUrl) && Uri.TryCreate(testProxyUrl, UriKind.Absolute, out var proxyUri))
-        {
-            Console.WriteLine("Inserting RecordingRedirectHandler for test proxy.");
-            // RecordingRedirectHandler should be the last delegating handler before the transport
-            pipeline = new RecordingRedirectHandler(proxyUri)
-            {
-                InnerHandler = pipeline
-            };
-        }
-        var client = new HttpClient(pipeline);
-#else
-        var client = new HttpClient(handler);
-#endif
-
-        // Apply default configuration
-        client.Timeout = _options.DefaultTimeout;
-
-        client.DefaultRequestHeaders.UserAgent.ParseAdd(UserAgent);
-
-        return client;
-    }
-
-    private HttpClientHandler CreateHttpClientHandler()
-    {
-        var handler = new HttpClientHandler();
-
-        // Configure proxy settings
-        var proxy = CreateProxy();
-        if (proxy != null)
-        {
-            handler.Proxy = proxy;
-            handler.UseProxy = true;
-        }
-
-        return handler;
-    }
-
-    private WebProxy? CreateProxy()
-    {
-        // Determine proxy address based on priority: ALL_PROXY, HTTPS_PROXY, HTTP_PROXY
-        string? proxyAddress = _options.AllProxy ?? _options.HttpsProxy ?? _options.HttpProxy;
-
-        if (string.IsNullOrEmpty(proxyAddress))
-        {
-            return null;
-        }
-
-        if (!Uri.TryCreate(proxyAddress, UriKind.Absolute, out var proxyUri))
-        {
-            return null;
-        }
-
-        var proxy = new WebProxy(proxyUri);
-
-        // Configure bypass list from NO_PROXY
-        if (!string.IsNullOrEmpty(_options.NoProxy))
-        {
-            var bypassList = _options.NoProxy
-                .Split(',', StringSplitOptions.RemoveEmptyEntries)
-                .Select(s => s.Trim())
-                .Where(s => !string.IsNullOrEmpty(s))
-                .Select(ConvertGlobToRegex)
-                .ToArray();
-
-            if (bypassList.Length > 0)
-            {
-                proxy.BypassList = bypassList;
-            }
-        }
-
-        return proxy;
-    }
-
-    /// <summary>
-    /// Converts a glob-style pattern (e.g., "*.local") to a regex pattern for WebProxy.BypassList
-    /// </summary>
-    private static string ConvertGlobToRegex(string globPattern)
-    {
-        if (string.IsNullOrEmpty(globPattern))
-        {
-            return string.Empty;
-        }
-
-        // Escape regex special characters except * and ?
-        var escaped = globPattern
-            .Replace("\\", "\\\\")
-            .Replace(".", "\\.")
-            .Replace("+", "\\+")
-            .Replace("$", "\\$")
-            .Replace("^", "\\^")
-            .Replace("{", "\\{")
-            .Replace("}", "\\}")
-            .Replace("[", "\\[")
-            .Replace("]", "\\]")
-            .Replace("(", "\\(")
-            .Replace(")", "\\)")
-            .Replace("|", "\\|");
-
-        // Convert glob wildcards to regex
-        // * means "match any number of characters"
-        // ? means "match any single character"
-        var regex = escaped
-            .Replace("*", ".*")
-            .Replace("?", ".");
-
-        // Anchor the pattern to match the entire string
-        return $"^{regex}$";
     }
 
     public void Dispose()

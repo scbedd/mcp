@@ -8,6 +8,7 @@ using Azure.Mcp.Core.Options;
 using Azure.Mcp.Core.Services.Azure;
 using Azure.Mcp.Core.Services.Azure.Subscription;
 using Azure.Mcp.Core.Services.Azure.Tenant;
+using System.Net.Http;
 using Azure.Mcp.Tools.AppConfig.Models;
 using Microsoft.Extensions.Logging;
 
@@ -15,8 +16,12 @@ namespace Azure.Mcp.Tools.AppConfig.Services;
 
 using ETag = Core.Models.ETag;
 
-public sealed class AppConfigService(ISubscriptionService subscriptionService, ITenantService tenantService, ILogger<AppConfigService> logger)
-    : BaseAzureResourceService(subscriptionService, tenantService), IAppConfigService
+public sealed class AppConfigService(
+    ISubscriptionService subscriptionService,
+    ITenantService tenantService,
+    ILogger<AppConfigService> logger,
+    IHttpClientFactory? httpClientFactory = null)
+    : BaseAzureResourceService(subscriptionService, tenantService, httpClientFactory), IAppConfigService
 {
     private readonly ILogger<AppConfigService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
@@ -151,8 +156,7 @@ public sealed class AppConfigService(ISubscriptionService subscriptionService, I
             throw new InvalidOperationException($"The App Configuration store '{accountName}' does not have a valid endpoint.");
         }
         var credential = await GetCredential(cancellationToken);
-        var options = new ConfigurationClientOptions();
-        AddDefaultPolicies(options);
+        var options = ConfigureClientOptions(new ConfigurationClientOptions());
 
         return new ConfigurationClient(new Uri(endpoint), credential, options);
     }

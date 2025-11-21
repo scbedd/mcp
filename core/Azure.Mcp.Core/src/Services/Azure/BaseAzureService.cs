@@ -1,11 +1,14 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+using System.Net.Http;
 using System.Reflection;
 using System.Runtime.Versioning;
 using Azure.Core;
+using Azure.Core.Pipeline;
 using Azure.Mcp.Core.Options;
 using Azure.Mcp.Core.Services.Azure.Tenant;
+using Azure.Mcp.Core.Services.Http;
 using Azure.ResourceManager;
 
 namespace Azure.Mcp.Core.Services.Azure;
@@ -17,6 +20,7 @@ public abstract class BaseAzureService
     private static volatile bool s_initialized = false;
     private static readonly object s_initializeLock = new();
     private readonly ITenantService? _tenantServiceDoNotUseDirectly;
+    private readonly IHttpClientFactory? _httpClientFactory;
 
     // Cache assembly metadata to avoid repeated reflection
     private static readonly string s_version;
@@ -71,11 +75,12 @@ public abstract class BaseAzureService
     /// <param name="tenantService">
     /// An <see cref="ITenantService"/> used for Azure API calls.
     /// </param>
-    protected BaseAzureService(ITenantService tenantService)
+    protected BaseAzureService(ITenantService tenantService, IHttpClientFactory? httpClientFactory = null)
     {
         ArgumentNullException.ThrowIfNull(tenantService, nameof(tenantService));
         TenantService = tenantService;
         UserAgent = s_userAgent ?? s_defaultUserAgent;
+        _httpClientFactory = httpClientFactory;
     }
 
     /// <summary>
@@ -86,6 +91,7 @@ public abstract class BaseAzureService
     internal BaseAzureService()
     {
         UserAgent = s_userAgent ?? s_defaultUserAgent;
+        _httpClientFactory = null;
     }
 
     protected string UserAgent { get; }
@@ -217,7 +223,7 @@ public abstract class BaseAzureService
         {
             TokenCredential credential = await GetCredential(tenantId, cancellationToken);
             ArmClientOptions options = armClientOptions ?? new();
-            ConfigureRetryPolicy(AddDefaultPolicies(options), retryPolicy);
+            ConfigureRetryPolicy(ConfigureClientOptions(options), retryPolicy);
 
             ArmClient armClient = new(credential, defaultSubscriptionId: default, options);
             return armClient;
@@ -245,5 +251,26 @@ public abstract class BaseAzureService
             throw new ArgumentException(
                 $"Required parameter{(missingParams.Length > 1 ? "s are" : " is")} null or empty: {string.Join(", ", missingParams)}");
         }
+    }
+
+    /// <summary>
+    /// Configures the transport for client options when an <see cref="IHttpClientFactory"/> is available.
+    /// </summary>
+    /// <typeparam name="T">Type of the client options.</typeparam>
+    /// <param name="clientOptions">Client options to configure.</param>
+    /// <returns>The configured client options.</returns>
+    protected T ConfigureClientOptions<T>(T clientOptions) where T : ClientOptions
+    {
+        ArgumentNullException.ThrowIfNull(clientOptions);
+
+        AddDefaultPolicies(clientOptions);
+
+        if (_httpClientFactory != null && clientOptions.Transport is null)
+        {
+            var httpClient = _httpClientFactory.CreateClient(HttpClientService.DefaultClientName);
+            clientOptions.Transport = new HttpClientTransport(httpClient);
+        }
+
+        return clientOptions;
     }
 }
