@@ -1,6 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+using System.Net.Http;
 using Azure.Core;
 using Azure.Mcp.Core.Services.Azure.Authentication;
 using Azure.Mcp.Core.Services.Caching;
@@ -13,16 +14,19 @@ public class TenantService : BaseAzureService, ITenantService
 {
     private readonly IAzureTokenCredentialProvider _credentialProvider;
     private readonly ICacheService _cacheService;
+    private readonly IHttpClientFactory _httpClientFactory;
     private const string CacheGroup = "tenant";
     private const string CacheKey = "tenants";
     private static readonly TimeSpan s_cacheDuration = TimeSpan.FromHours(12);
 
     public TenantService(
         IAzureTokenCredentialProvider credentialProvider,
-        ICacheService cacheService)
+        ICacheService cacheService,
+        IHttpClientFactory httpClientFactory)
     {
         _credentialProvider = credentialProvider;
         _cacheService = cacheService ?? throw new ArgumentNullException(nameof(cacheService));
+        _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
         TenantService = this;
     }
 
@@ -39,10 +43,9 @@ public class TenantService : BaseAzureService, ITenantService
         // If not in cache, fetch from Azure
         var results = new List<TenantResource>();
 
-        var options = AddDefaultPolicies(new ArmClientOptions());
-        var client = new ArmClient(await GetCredential(cancellationToken), default, options);
+        var client = await CreateArmClientAsync(cancellationToken: cancellationToken);
 
-        await foreach (var tenant in client.GetTenants())
+        await foreach (var tenant in client.GetTenants().WithCancellation(cancellationToken))
         {
             results.Add(tenant);
         }
@@ -101,5 +104,10 @@ public class TenantService : BaseAzureService, ITenantService
     public async Task<TokenCredential> GetTokenCredentialAsync(string? tenantId, CancellationToken cancellationToken)
     {
         return await _credentialProvider.GetTokenCredentialAsync(tenantId, cancellationToken);
+    }
+
+    public HttpClient CreateClient()
+    {
+        return _httpClientFactory.CreateClient();
     }
 }

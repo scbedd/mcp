@@ -1,6 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+using System.Net.Http;
 using Azure.Core;
 using Azure.Mcp.Core.Services.Azure.Authentication;
 using Azure.ResourceManager.Resources;
@@ -102,4 +103,9 @@ public interface ITenantService
     Task<TokenCredential> GetTokenCredentialAsync(
         string? tenantId,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Creates an HTTP client configured for Azure management operations.
+    /// </summary>
+    HttpClient CreateClient();
 }

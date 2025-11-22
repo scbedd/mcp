@@ -1,6 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+using System.Net.Http;
 using System.Text.Json;
 using Azure.Mcp.Core.Services.Azure.Authentication;
 using Azure.Mcp.Core.Services.Azure.Tenant;
@@ -17,6 +18,11 @@ namespace Azure.Mcp.Tools.Marketplace.LiveTests;
 [Trait("Area", "Marketplace")]
 public class ProductListCommandTests : CommandTestsBase
 {
+    private sealed class SimpleHttpClientFactory : IHttpClientFactory
+    {
+        public HttpClient CreateClient(string name) => new HttpClient();
+    }
+
     private const string ProductsKey = "products";
     private const string Language = "en";
     private readonly MarketplaceService _marketplaceService;
@@ -26,7 +32,7 @@ public class ProductListCommandTests : CommandTestsBase
         var memoryCache = new MemoryCache(Microsoft.Extensions.Options.Options.Create(new MemoryCacheOptions()));
         var cacheService = new SingleUserCliCacheService(memoryCache);
         var tokenProvider = new SingleIdentityTokenCredentialProvider(NullLoggerFactory.Instance);
-        var tenantService = new TenantService(tokenProvider, cacheService);
+        var tenantService = new TenantService(tokenProvider, cacheService, new SimpleHttpClientFactory());
         _marketplaceService = new MarketplaceService(tenantService);
     }
 
