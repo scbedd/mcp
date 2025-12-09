@@ -305,6 +305,11 @@ public abstract class RecordedCommandTestsBase(ITestOutputHelper output, TestPro
         var pathToRecording = GetSessionFilePath(testName);
         var assetsPath = PathResolver.GetAssetsJson(GetType());
 
+        if (assetsPath == null && TestMode != TestMode.Live)
+        {
+            throw new InvalidOperationException("An \"assets.json\" file was not found alongside the LiveTest csproj. Follow instructions present in /docs/recorded-tests.md to remediate.");
+        }
+
         var recordOptions = new Dictionary<string, string>
         {
             { "x-recording-file", pathToRecording },

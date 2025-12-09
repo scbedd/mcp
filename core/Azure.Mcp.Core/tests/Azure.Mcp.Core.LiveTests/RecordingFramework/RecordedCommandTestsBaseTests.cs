@@ -24,6 +24,13 @@ public sealed class RecordedCommandTestsBaseTest : IAsyncLifetime
     private ITestOutputHelper CollectedOutput = Substitute.For<ITestOutputHelper>();
     private RecordedCommandTestHarness? DefaultHarness;
 
+    //[Fact]
+    //public async Task PlaybackOrRecordingFailsWithoutAssetsPresent()
+    //{
+
+    //}
+
+    
     [Fact]
     public async Task ProxyRecordProducesRecording()
     {
